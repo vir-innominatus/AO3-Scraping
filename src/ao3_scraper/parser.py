@@ -7,9 +7,10 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 
 from ao3_scraper.http import BASE_URL
-from ao3_scraper.models import WorkRecord
+from ao3_scraper.models import BookmarkRecord, WorkRecord
 
 WORK_ID_RE = re.compile(r"work_(\d+)")
+USER_ID_RE = re.compile(r"user-(\d+)")
 CHAPTERS_RE = re.compile(r"^\s*(\d+)\s*/\s*(\?|\d+)\s*$")
 
 
@@ -160,3 +161,38 @@ def parse_tag_page(html: str, source_url: str) -> list[WorkRecord]:
         records.append(record)
 
     return records
+
+
+def parse_bookmarks_page(html: str, work_id: int) -> tuple[list[BookmarkRecord], bool]:
+    soup = BeautifulSoup(html, "html.parser")
+    bookmark_nodes: Iterable[Tag] = soup.select("ol.bookmark.index.group > li.user.short.blurb.group")
+    records: list[BookmarkRecord] = []
+
+    for node in bookmark_nodes:
+        classes = node.get("class", [])
+        user_id = None
+        for cls in classes:
+            match = USER_ID_RE.fullmatch(cls)
+            if match:
+                user_id = int(match.group(1))
+                break
+        if user_id is None:
+            continue
+
+        user_anchor = node.select_one("h5.byline.heading a[href*='/users/'][href*='/pseuds/']")
+        username = _text_or_none(user_anchor)
+        href = user_anchor.get("href") if user_anchor else None
+        if not username or not href:
+            continue
+
+        record = BookmarkRecord(
+            work_id=work_id,
+            user_id=user_id,
+            username=username,
+            pseud_url=urljoin(BASE_URL, href),
+            bookmarked_date=_text_or_none(node.select_one("p.datetime")),
+        )
+        records.append(record)
+
+    has_next_page = bool(soup.select_one("ol.pagination.actions.pagy li.next a[href]"))
+    return records, has_next_page

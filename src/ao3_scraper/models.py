@@ -30,3 +30,12 @@ class WorkRecord:
     bookmarks: int | None = None
     hits: int | None = None
     updated_date: str | None = None
+
+
+@dataclass(slots=True)
+class BookmarkRecord:
+    work_id: int
+    user_id: int
+    username: str
+    pseud_url: str
+    bookmarked_date: str | None = None

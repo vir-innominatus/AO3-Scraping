@@ -14,6 +14,11 @@ dependencies = [
   "playwright>=1.51.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

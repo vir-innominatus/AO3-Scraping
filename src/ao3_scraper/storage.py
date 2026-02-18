@@ -6,7 +6,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ao3_scraper.models import WorkRecord
+from ao3_scraper.models import BookmarkRecord, WorkRecord
 
 
 def ensure_parent_dir(path: Path) -> None:
@@ -51,6 +51,24 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             tag_text TEXT NOT NULL,
             PRIMARY KEY (work_id, tag_type, tag_text),
             FOREIGN KEY (work_id) REFERENCES works(work_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL,
+            pseud_url TEXT NOT NULL,
+            last_seen_utc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            work_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            bookmarked_date TEXT,
+            source_bookmarks_url TEXT NOT NULL,
+            scraped_at_utc TEXT NOT NULL,
+            PRIMARY KEY (work_id, user_id),
+            FOREIGN KEY (work_id) REFERENCES works(work_id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         );
         """
     )
@@ -198,4 +216,38 @@ def write_works_csv(csv_path: Path, records: list[WorkRecord]) -> None:
                     "hits": record.hits,
                     "updated_date": record.updated_date or "",
                 }
+            )
+
+
+def upsert_bookmarks(conn: sqlite3.Connection, records: list[BookmarkRecord], source_bookmarks_url: str) -> None:
+    scraped_at = datetime.now(UTC).isoformat()
+    with conn:
+        for record in records:
+            conn.execute(
+                """
+                INSERT INTO users (user_id, username, pseud_url, last_seen_utc)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = excluded.username,
+                    pseud_url = excluded.pseud_url,
+                    last_seen_utc = excluded.last_seen_utc
+                """,
+                (record.user_id, record.username, record.pseud_url, scraped_at),
+            )
+            conn.execute(
+                """
+                INSERT INTO bookmarks (work_id, user_id, bookmarked_date, source_bookmarks_url, scraped_at_utc)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(work_id, user_id) DO UPDATE SET
+                    bookmarked_date = excluded.bookmarked_date,
+                    source_bookmarks_url = excluded.source_bookmarks_url,
+                    scraped_at_utc = excluded.scraped_at_utc
+                """,
+                (
+                    record.work_id,
+                    record.user_id,
+                    record.bookmarked_date,
+                    source_bookmarks_url,
+                    scraped_at,
+                ),
             )
