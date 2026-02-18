@@ -5,7 +5,7 @@ from pathlib import Path
 
 from bs4 import UnicodeDammit
 
-from ao3_scraper.http import AO3BlockedError, fetch_html
+from ao3_scraper.http import AO3FetchError, fetch_html
 from ao3_scraper.parser import parse_tag_page
 from ao3_scraper.rate_limit import DelayPolicy, RequestThrottler
 from ao3_scraper.storage import init_db, upsert_works, write_works_csv
@@ -41,8 +41,8 @@ def cmd_scrape_tag_page(args: argparse.Namespace) -> int:
         throttler = RequestThrottler(DelayPolicy(base_seconds=args.base_delay, jitter_seconds=args.jitter))
         try:
             html = fetch_html(args.tag_url, throttler=throttler)
-        except AO3BlockedError as exc:
-            print(f"Fetch blocked: {exc}")
+        except AO3FetchError as exc:
+            print(f"Fetch failed: {exc}")
             return 1
         source_url = args.tag_url
 
