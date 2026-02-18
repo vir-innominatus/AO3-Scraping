@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ao3-scraper"
+version = "0.1.0"
+description = "AO3 tag page scraper prototype with SQLite and CSV output."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "beautifulsoup4>=4.12.0",
+  "httpx>=0.27.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
