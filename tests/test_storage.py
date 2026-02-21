@@ -5,9 +5,9 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from ao3_scraper.parser import parse_bookmarks_page
+from ao3_scraper.parser import parse_bookmarks_page, parse_kudos_page
 from ao3_scraper.storage import init_db, upsert_works, write_works_csv
-from ao3_scraper.storage import upsert_bookmarks
+from ao3_scraper.storage import update_work_guest_kudos, upsert_bookmarks, upsert_kudos
 
 
 def test_upsert_works_writes_rows_and_tags(parsed_records, tmp_path: Path):
@@ -93,3 +93,36 @@ def test_upsert_bookmarks_writes_users_and_edges(parsed_records, sample_bookmark
     assert user_count == 20
     assert bookmark_count == 20
     assert sample == (336061, "06 Feb 2026")
+
+
+def test_upsert_kudos_writes_edges(parsed_records, sample_kudos_html, tmp_path: Path):
+    db_path = tmp_path / "ao3_test.db"
+    conn = init_db(db_path)
+    work = parsed_records[0]
+    upsert_works(conn, [work], source_tag_url="https://example.com/tag")
+    kudos_records = parse_kudos_page(sample_kudos_html, work_id=work.work_id)
+
+    upsert_kudos(conn, kudos_records, source_work_url=work.work_url)
+
+    kudos_count = conn.execute("SELECT COUNT(*) FROM kudos").fetchone()[0]
+    sample = conn.execute(
+        "SELECT username, pseud_url FROM kudos WHERE work_id = ? ORDER BY pseud_url LIMIT 1",
+        (work.work_id,),
+    ).fetchone()
+    conn.close()
+
+    assert kudos_count == 3
+    assert sample == ("Mikel2121", "https://archiveofourown.org/users/Mikel2121/pseuds/Mikel2121")
+
+
+def test_update_work_guest_kudos(parsed_records, tmp_path: Path):
+    db_path = tmp_path / "ao3_test.db"
+    conn = init_db(db_path)
+    work = parsed_records[0]
+    upsert_works(conn, [work], source_tag_url="https://example.com/tag")
+
+    update_work_guest_kudos(conn, work_id=work.work_id, guest_kudos=42)
+
+    value = conn.execute("SELECT guest_kudos FROM works WHERE work_id = ?", (work.work_id,)).fetchone()[0]
+    conn.close()
+    assert value == 42

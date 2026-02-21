@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ao3_scraper.parser import parse_bookmarks_page
+from ao3_scraper.parser import parse_bookmarks_page, parse_guest_kudos_count, parse_kudos_page
 
 
 def test_parse_tag_page_extracts_expected_count(parsed_records):
@@ -43,3 +43,17 @@ def test_parse_bookmarks_page_extracts_users(sample_bookmarks_html):
     assert first.user_id == 13783858
     assert first.username == "Mikel2121"
     assert first.pseud_url == "https://archiveofourown.org/users/Mikel2121/pseuds/Mikel2121"
+
+
+def test_parse_kudos_page_extracts_users(sample_kudos_html):
+    records = parse_kudos_page(sample_kudos_html, work_id=68104166)
+    assert len(records) == 3
+
+    first = records[0]
+    assert first.work_id == 68104166
+    assert first.username == "Mikel2121"
+    assert first.pseud_url == "https://archiveofourown.org/users/Mikel2121/pseuds/Mikel2121"
+
+
+def test_parse_guest_kudos_count(sample_kudos_html):
+    assert parse_guest_kudos_count(sample_kudos_html) == 17

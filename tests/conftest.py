@@ -34,3 +34,13 @@ def sample_bookmarks_html() -> str:
     if html is None:
         raise ValueError(f"Could not decode HTML fixture: {input_path}")
     return html
+
+
+@pytest.fixture
+def sample_kudos_html() -> str:
+    input_path = Path(__file__).resolve().parents[1] / "ao3_kudos_sample.html"
+    raw_html = input_path.read_bytes()
+    html = UnicodeDammit(raw_html).unicode_markup
+    if html is None:
+        raise ValueError(f"Could not decode HTML fixture: {input_path}")
+    return html
