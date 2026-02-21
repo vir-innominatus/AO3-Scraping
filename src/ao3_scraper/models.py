@@ -27,6 +27,7 @@ class WorkRecord:
     chapters_total: int | None = None
     comments: int | None = None
     kudos: int | None = None
+    guest_kudos: int | None = None
     bookmarks: int | None = None
     hits: int | None = None
     updated_date: str | None = None
@@ -39,3 +40,10 @@ class BookmarkRecord:
     username: str
     pseud_url: str
     bookmarked_date: str | None = None
+
+
+@dataclass(slots=True)
+class KudosRecord:
+    work_id: int
+    username: str
+    pseud_url: str

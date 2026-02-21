@@ -6,7 +6,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ao3_scraper.models import BookmarkRecord, WorkRecord
+from ao3_scraper.models import BookmarkRecord, KudosRecord, WorkRecord
 
 
 def ensure_parent_dir(path: Path) -> None:
@@ -38,6 +38,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             chapters_total INTEGER,
             comments INTEGER,
             kudos INTEGER,
+            guest_kudos INTEGER,
             bookmarks INTEGER,
             hits INTEGER,
             updated_date TEXT,
@@ -70,9 +71,28 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             FOREIGN KEY (work_id) REFERENCES works(work_id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS kudos (
+            work_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            pseud_url TEXT NOT NULL,
+            source_work_url TEXT NOT NULL,
+            scraped_at_utc TEXT NOT NULL,
+            PRIMARY KEY (work_id, pseud_url),
+            FOREIGN KEY (work_id) REFERENCES works(work_id) ON DELETE CASCADE
+        );
         """
     )
+    _ensure_column(conn, "works", "guest_kudos", "INTEGER")
     return conn
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column in existing:
+        return
+    with conn:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
 def upsert_works(conn: sqlite3.Connection, records: list[WorkRecord], source_tag_url: str) -> None:
@@ -84,9 +104,9 @@ def upsert_works(conn: sqlite3.Connection, records: list[WorkRecord], source_tag
                 INSERT INTO works (
                     work_id, title, work_url, author_name, author_url, fandoms_json, summary, summary_len,
                     rating, warning_summary, category, completion_status, language, words, chapters_current,
-                    chapters_total, comments, kudos, bookmarks, hits, updated_date, source_tag_url, scraped_at_utc
+                    chapters_total, comments, kudos, guest_kudos, bookmarks, hits, updated_date, source_tag_url, scraped_at_utc
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(work_id) DO UPDATE SET
                     title = excluded.title,
                     work_url = excluded.work_url,
@@ -105,6 +125,7 @@ def upsert_works(conn: sqlite3.Connection, records: list[WorkRecord], source_tag
                     chapters_total = excluded.chapters_total,
                     comments = excluded.comments,
                     kudos = excluded.kudos,
+                    guest_kudos = COALESCE(excluded.guest_kudos, works.guest_kudos),
                     bookmarks = excluded.bookmarks,
                     hits = excluded.hits,
                     updated_date = excluded.updated_date,
@@ -130,6 +151,7 @@ def upsert_works(conn: sqlite3.Connection, records: list[WorkRecord], source_tag
                     record.chapters_total,
                     record.comments,
                     record.kudos,
+                    record.guest_kudos,
                     record.bookmarks,
                     record.hits,
                     record.updated_date,
@@ -181,6 +203,7 @@ def write_works_csv(csv_path: Path, records: list[WorkRecord]) -> None:
                 "chapters_total",
                 "comments",
                 "kudos",
+                "guest_kudos",
                 "bookmarks",
                 "hits",
                 "updated_date",
@@ -212,6 +235,7 @@ def write_works_csv(csv_path: Path, records: list[WorkRecord]) -> None:
                     "chapters_total": record.chapters_total,
                     "comments": record.comments,
                     "kudos": record.kudos,
+                    "guest_kudos": record.guest_kudos,
                     "bookmarks": record.bookmarks,
                     "hits": record.hits,
                     "updated_date": record.updated_date or "",
@@ -251,3 +275,34 @@ def upsert_bookmarks(conn: sqlite3.Connection, records: list[BookmarkRecord], so
                     scraped_at,
                 ),
             )
+
+
+def upsert_kudos(conn: sqlite3.Connection, records: list[KudosRecord], source_work_url: str) -> None:
+    scraped_at = datetime.now(UTC).isoformat()
+    with conn:
+        for record in records:
+            conn.execute(
+                """
+                INSERT INTO kudos (work_id, username, pseud_url, source_work_url, scraped_at_utc)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(work_id, pseud_url) DO UPDATE SET
+                    username = excluded.username,
+                    source_work_url = excluded.source_work_url,
+                    scraped_at_utc = excluded.scraped_at_utc
+                """,
+                (
+                    record.work_id,
+                    record.username,
+                    record.pseud_url,
+                    source_work_url,
+                    scraped_at,
+                ),
+            )
+
+
+def update_work_guest_kudos(conn: sqlite3.Connection, work_id: int, guest_kudos: int | None) -> None:
+    with conn:
+        conn.execute(
+            "UPDATE works SET guest_kudos = ? WHERE work_id = ?",
+            (guest_kudos, work_id),
+        )

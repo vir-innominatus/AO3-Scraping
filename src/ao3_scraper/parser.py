@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 
 from ao3_scraper.http import BASE_URL
-from ao3_scraper.models import BookmarkRecord, WorkRecord
+from ao3_scraper.models import BookmarkRecord, KudosRecord, WorkRecord
 
 WORK_ID_RE = re.compile(r"work_(\d+)")
 USER_ID_RE = re.compile(r"user-(\d+)")
@@ -196,3 +196,46 @@ def parse_bookmarks_page(html: str, work_id: int) -> tuple[list[BookmarkRecord],
 
     has_next_page = bool(soup.select_one("ol.pagination.actions.pagy li.next a[href]"))
     return records, has_next_page
+
+
+def parse_kudos_page(html: str, work_id: int) -> list[KudosRecord]:
+    soup = BeautifulSoup(html, "html.parser")
+    user_nodes: Iterable[Tag] = soup.select("#kudos a[href^='/users/']")
+    records: list[KudosRecord] = []
+    seen_urls: set[str] = set()
+
+    for node in user_nodes:
+        if node.get("id") == "kudos_more_link":
+            continue
+        username = _text_or_none(node)
+        href = node.get("href")
+        if not username or not href:
+            continue
+
+        pseud_url = urljoin(BASE_URL, href)
+        if pseud_url in seen_urls:
+            continue
+        seen_urls.add(pseud_url)
+
+        records.append(
+            KudosRecord(
+                work_id=work_id,
+                username=username,
+                pseud_url=pseud_url,
+            )
+        )
+
+    return records
+
+
+def parse_guest_kudos_count(html: str) -> int | None:
+    soup = BeautifulSoup(html, "html.parser")
+    kudos = soup.select_one("#kudos")
+    if kudos is None:
+        return None
+
+    text = kudos.get_text(" ", strip=True)
+    match = re.search(r"(\d[\d,]*)\s+guests?\s+left\s+kudos", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    return int(match.group(1).replace(",", ""))
