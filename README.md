@@ -1,53 +1,48 @@
-# AO3 Scraper (Step 1-2)
+# AO3 Scraper + Similar Works Recommender
 
-This scaffold fetches and parses one AO3 tag works page, then writes:
+Scrape AO3 works/bookmarks/kudos into SQLite, generate similar-work recommendations from kudos overlap, and export static JSON for a browser-based recommendation app.
 
-- A SQLite database (`works` + `work_tags` tables)
-- A flat CSV for works
+Live web app: https://vir-innominatus.github.io/AO3-Scraping/
 
 ## Quickstart
+
+### 1. Set up Python and dependencies
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e .
 playwright install chromium
+```
+
+### 2. (Optional) Capture login state AO3
+This is needed to scrape works that are only visible when logged in.
+
+```bash
 python -m ao3_scraper.cli capture-login-state ^
   --storage-state data\ao3_storage_state.json
+```
 
-python -m ao3_scraper.cli scrape-tag-page ^
-  --tag-url "https://archiveofourown.org/tags/Hermione%20Granger*s*Harry%20Potter/works" ^
-  --db-path data\ao3.db ^
-  --csv-path data\works.csv ^
-  --base-delay 3.0 ^
-  --jitter 0.8 ^
-  --storage-state data\ao3_storage_state.json
+### 3. Scrape a range of AO3 listing pages into SQLite
 
+```bash
 python -m ao3_scraper.cli scrape-tag-range ^
-  --tag-url "https://archiveofourown.org/works?commit=Sort+and+Filter&work_search[sort_column]=created_at&work_search[other_tag_names]=&work_search[excluded_tag_names]=&work_search[crossover]=&work_search[complete]=&work_search[words_from]=&work_search[words_to]=&work_search[date_from]=&work_search[date_to]=&work_search[query]=&work_search[language_id]=&tag_id=Hermione+Granger*s*Harry+Potter&page=581" ^
-  --start-page 582 ^
+  --tag-url "https://archiveofourown.org/tags/Hermione%20Granger*s*Harry%20Potter/works" ^
+  --start-page 1 ^
   --end-page 500 ^
   --db-path data\ao3.db ^
-  --base-delay 3.0 ^
-  --jitter 0.8 ^
+  --base-delay 5.0 ^
+  --jitter 2.0 ^
   --storage-state data\ao3_storage_state.json ^
   --max-429-retries 6 ^
-  --retry-cooldown-seconds 300 ^
+  --retry-cooldown-seconds 180 ^
   --max-retry-cooldown-seconds 1800 ^
   --progress-every 10
+```
 
-python -m ao3_scraper.cli scrape-bookmarks-from-db ^
-  --db-path data\ao3.db ^
-  --max-works 10 ^
-  --max-pages-per-work 2 ^
-  --base-delay 3.0 ^
-  --jitter 0.8 ^
-  --storage-state data\ao3_storage_state.json ^
-  --max-429-retries 6 ^
-  --retry-cooldown-seconds 300 ^
-  --max-retry-cooldown-seconds 1800 ^
-  --progress-every 10
+### 4. Scrape kudos users for works already in your DB
 
+```bash
 python -m ao3_scraper.cli scrape-kudos-from-db ^
   --db-path data\ao3.db ^
   --max-works 10 ^
@@ -60,14 +55,24 @@ python -m ao3_scraper.cli scrape-kudos-from-db ^
   --retry-cooldown-seconds 300 ^
   --max-retry-cooldown-seconds 1800 ^
   --progress-every 10
+```
 
+### 5. Generate recommendations for a target work
+This builds/uses the recommender model and prints top similar works in the terminal.
+
+```bash
 python scripts\recommend_similar_works.py ^
   --db-path data\ao3.db ^
   --work-id 1085412 ^
   --top-k 20 ^
   --min-overlap 3 ^
   --min-candidate-kudos 25
+```
 
+### 6. Export recommendations JSON for the web app
+This writes the static payload used by `docs/index.html`.
+
+```bash
 python scripts\export_recommendations_for_web.py ^
   --cache-path data\kudos_recommender_cache.pkl ^
   --output-path docs\data\recommendations.json ^
@@ -79,7 +84,7 @@ python scripts\export_recommendations_for_web.py ^
 
 ## GitHub Pages App
 
-This repo now includes a static web app in `docs/` that reads precomputed recommendations from JSON.
+This repo includes a static web app in `docs/` that reads precomputed recommendations from JSON.
 
 - `scripts/export_recommendations_for_web.py` uses the recommender cache file (`data/kudos_recommender_cache.pkl`) so it does not need to process `ao3.db` for web export.
 - The generated payload is written to `docs/data/recommendations.json`.
@@ -103,19 +108,14 @@ GitHub Pages setup:
 
 - Request throttling is enforced between requests as `base_delay + random(0, jitter)`.
 - The parser currently handles one works page at a time by design.
-- Live requests use Playwright Chromium for fetching.
 - Live requests reuse a single Playwright browser/context session (same process/arguments).
-- `capture-login-state` opens a browser so you can log in and save a reusable Playwright session file.
 - Pass `--storage-state` when crawling to include login-restricted works/bookmarks.
 - HTTP 429 is retried with cooldown and exponential backoff (`Retry-After` is used when available).
-- You can still parse local files with `--input-html` (no network request).
 - `scrape-tag-range` updates only the `page` parameter and preserves the rest of your query string.
-- `scrape-tag-range` crawls descending when `start-page > end-page`.
-- `scrape-bookmarks-from-db` reads `works` rows and writes `users` + `bookmarks` edges.
+- `scrape-tag-range` crawls descending when `start-page < end-page`.
 - `scrape-kudos-from-db` opens each work page with `view_adult=true`, repeatedly clicks `#kudos_more_link`, and writes `kudos` edges.
 - `scrape-kudos-from-db` also stores parsed guest kudos into `works.guest_kudos` when available.
 - `scrape-kudos-from-db` skips works that already have saved kudos by default. Use `--no-skip-already-scraped-kudos` to force re-crawling.
 - `scripts/recommend_similar_works.py` builds a sparse work-user kudos model and returns similar works using weighted cosine + overlap shrinkage.
 - Use `--title-query "partial title"` instead of `--work-id` to search and pick a target work interactively.
 - The recommender writes `data/kudos_recommender_cache.pkl` for faster repeat queries; pass `--rebuild-cache` to refresh.
-- `scripts/export_recommendations_for_web.py` builds static JSON for the GitHub Pages app from the recommender cache.
