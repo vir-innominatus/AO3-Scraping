@@ -67,7 +67,37 @@ python scripts\recommend_similar_works.py ^
   --top-k 20 ^
   --min-overlap 3 ^
   --min-candidate-kudos 25
+
+python scripts\export_recommendations_for_web.py ^
+  --cache-path data\kudos_recommender_cache.pkl ^
+  --output-path docs\data\recommendations.json ^
+  --top-k 20 ^
+  --min-overlap 3 ^
+  --min-candidate-kudos 25 ^
+  --min-target-kudos 25
 ```
+
+## GitHub Pages App
+
+This repo now includes a static web app in `docs/` that reads precomputed recommendations from JSON.
+
+- `scripts/export_recommendations_for_web.py` uses the recommender cache file (`data/kudos_recommender_cache.pkl`) so it does not need to process `ao3.db` for web export.
+- The generated payload is written to `docs/data/recommendations.json`.
+- The page entry point is `docs/index.html`.
+
+Local preview:
+
+```bash
+python -m http.server --directory docs 8000
+```
+
+Then open `http://localhost:8000`.
+
+GitHub Pages setup:
+
+1. Push `docs/` to your repo.
+2. In GitHub repo settings, set Pages source to `Deploy from a branch`.
+3. Choose your branch and folder `/docs`.
 
 ## Notes
 
@@ -88,3 +118,4 @@ python scripts\recommend_similar_works.py ^
 - `scripts/recommend_similar_works.py` builds a sparse work-user kudos model and returns similar works using weighted cosine + overlap shrinkage.
 - Use `--title-query "partial title"` instead of `--work-id` to search and pick a target work interactively.
 - The recommender writes `data/kudos_recommender_cache.pkl` for faster repeat queries; pass `--rebuild-cache` to refresh.
+- `scripts/export_recommendations_for_web.py` builds static JSON for the GitHub Pages app from the recommender cache.
