@@ -5,6 +5,5 @@ __pycache__/
 build/
 dist/
 *.db
-*.html
 *.csv
 ao3_storage_state.json

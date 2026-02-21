@@ -1,0 +1,71 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AO3 Similar Works</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="kicker">AO3 Recommender</p>
+        <h1>Harmony Explorer</h1>
+        <p id="status" class="status">Loading recommendation data...</p>
+      </header>
+
+      <section class="panel">
+        <label for="queryInput">Find a work by title, author, or work ID</label>
+        <div class="search-row">
+          <input id="queryInput" type="text" placeholder="Example: Definitions of Romance" autocomplete="off" />
+          <button id="searchButton" type="button">Search</button>
+        </div>
+        <p id="resultsHeading" class="results-heading" hidden>Search Results. Click one to find similar works.</p>
+        <ul id="matches" class="matches" hidden></ul>
+      </section>
+
+      <section id="selected" class="panel selected" hidden>
+        <h2 id="selectedTitle"></h2>
+        <p id="selectedMeta"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Top Similar Works</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Work</th>
+                <th>Score</th>
+                <th>Cosine</th>
+                <th>Overlap</th>
+                <th>Kudos Edges</th>
+              </tr>
+            </thead>
+            <tbody id="recsBody">
+              <tr>
+                <td colspan="6" class="empty">Select a work to see recommendations.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="metricNotes" class="metric-notes" aria-labelledby="metricNotesTitle">
+        <h3 id="metricNotesTitle">How to Read the Numbers</h3>
+        <ul>
+          <li><strong>Score:</strong> Overall number used to rank similarity. It combines the cosine and overlap numbers. A higher value usually means a more reliable match.</li>
+          <li><strong>Cosine:</strong> How similar the two works' kudos-reader audiences are, ignoring size. Higher means the same kinds of AO3 users tend to kudos both works. You can read more about it here: <a href="https://naomy-gomes.medium.com/the-cosine-similarity-and-its-use-in-recommendation-systems-cb2ebd811ce1" target="_blank" rel="noopener noreferrer">Cosine similarity overview</a>.</li>
+          <li><strong>Overlap:</strong> How many specific AO3 users gave kudos to both the work you picked and this recommendation. Bigger overlap means more direct shared readership.</li>
+          <li><strong>Kudos Edges:</strong> How many individual kudos-user entries we have for this recommended work in the dataset. It's lower than the total number of kudos because of guest kudos from readers that don't have an AO3 account.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
