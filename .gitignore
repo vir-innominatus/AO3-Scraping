@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+local/
 *.db
 *.csv
 ao3_storage_state.json
