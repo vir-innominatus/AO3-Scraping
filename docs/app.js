@@ -143,18 +143,20 @@ function selectWork(workId, options = {}) {
   workLink.rel = "noopener noreferrer";
   selectedMetaEl.append(metaPrefix, workLink);
 
-  if (scrollToSelection) {
-    selectedEl.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   const recs = data.recommendations[String(workId)] || [];
   if (!recs.length) {
     setEmptyRecommendations("No recommendations matched export filters for this work.");
+    if (scrollToSelection) {
+      selectedEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     return;
   }
 
   recsBodyEl.textContent = "";
   recs.forEach((rec, idx) => recsBodyEl.appendChild(recommendationRow(idx + 1, rec)));
+  if (scrollToSelection) {
+    selectedEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function searchAndRender() {
